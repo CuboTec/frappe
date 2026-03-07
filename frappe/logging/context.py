@@ -18,11 +18,38 @@ import uuid
 from contextlib import contextmanager
 from typing import Iterator
 
-from structlog.contextvars import bind_contextvars, unbind_contextvars
+from structlog.contextvars import bind_contextvars, unbind_contextvars, clear_contextvars
 
 
 def set_trace_id_context():
 	bind_contextvars(trace_id=str(uuid.uuid4()))
+
+
+def bind_request_context(
+	request_id: str | None = None,
+	user: str | None = None,
+	site: str | None = None,
+	path: str | None = None,
+	method: str | None = None,
+) -> str:
+	rid = request_id or str(uuid.uuid4())
+	payload = {"request_id": rid}
+
+	if user:
+		payload["user"] = user
+	if site:
+		payload["site"] = site
+	if path:
+		payload["path"] = path
+	if method:
+		payload["http_method"] = method
+
+	bind_contextvars(**payload)
+	return rid
+
+
+def clear_request_context() -> None:
+	clear_contextvars()
 
 
 def bind_event_context(event):
@@ -40,5 +67,3 @@ def bound_event_context(name: str) -> Iterator[None]:
 		yield
 	finally:
 		unbind_event_context()
-
-

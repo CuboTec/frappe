@@ -1,29 +1,38 @@
 """
-Provides functionality to configure structured logging and retrieve structured loggers.
+Provides logging configuration and utilities for the application.
 
-This module includes functions to configure logging with adjustable log level, contextual
-logging processors, and output formats for different environments. It also provides
-support to integrate with external log collectors like Logstash, enabling flexible and
-extensible logging in Python applications.
+This module configures logging for the application, including integration
+with StructLog and optional support for Logstash. It provides functionalities
+for setting up logging processors, formatters, and configuring log output for
+various environments (e.g., development and production). Additionally, it
+provides a utility function for retrieving structured loggers.
 
-Constants:
-    ENVIRONMENT (str): The current application environment, defaults to "development".
-    VERSION (str): The application's version information, defaults to "cubo-v15.0.0".
-    LOG_LEVEL (str): The level of logging verbosity, defaults to "INFO".
+Attributes:
+    ENVIRONMENT (str): The current environment (e.g., development, production).
+    VERSION (str): The version of the application.
+    LOG_LEVEL (str): The default logging level.
+    LOGSTASH_HOST (str): The host address of the Logstash server.
+    LOGSTASH_PORT (int): The port number of the Logstash server.
 
 Functions:
-    configure_logging: Configures structured logging with processors and handlers.
-    get_logger: Retrieves a structured logger instance for use in the application.
+    configure_logging: Configures application-wide logging with StructLog.
+    get_logger: Retrieves a StructLog-bound logger with the specified name.
 """
 from __future__ import annotations
 
 import logging
 import sys
 from os import getenv
-from typing import Any, MutableMapping, Optional, List
+from typing import List
 
 import logstash
 import structlog
+from frappe.logging.processors import add_base_contexts
+
+try:
+	import frappe
+except Exception:
+	frappe = None
 
 ENVIRONMENT = getenv("ENVIRONMENT", "development")
 VERSION = getenv("VERSION", "cubo-v15.0.0")
@@ -44,17 +53,6 @@ def _resolve_log_level(log_level: str) -> int:
 	return _LOG_LEVEL_MAP.get(log_level.upper(), logging.INFO)
 
 
-def _add_base_fields(workflow: Optional[str] = None):
-	def processor(_: Any, __: str, event_dict: MutableMapping[str, Any]) -> MutableMapping[
-		str, Any]:
-		event_dict["application"] = f"oneglobal-digital-{ENVIRONMENT}"
-		event_dict["workflow"] = workflow or 'frappe'
-		event_dict['version'] = VERSION
-		return event_dict
-
-	return processor
-
-
 def configure_logging(*, app_name: str) -> None:
 	logging.basicConfig(
 		format="%(message)s",
@@ -65,7 +63,7 @@ def configure_logging(*, app_name: str) -> None:
 
 	processors: List[structlog.typing.Processor] = [
 		structlog.contextvars.merge_contextvars,
-		_add_base_fields(app_name),
+		add_base_contexts(ENVIRONMENT, VERSION, app_name),
 		structlog.processors.add_log_level,
 		structlog.processors.TimeStamper(fmt="iso", utc=True),
 		structlog.processors.StackInfoRenderer(),
@@ -119,10 +117,8 @@ def configure_logging(*, app_name: str) -> None:
 	structlog.configure(
 		processors=processors,
 		logger_factory=structlog.stdlib.LoggerFactory(),
-		wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+		wrapper_class=structlog.make_filtering_bound_logger(
+			_resolve_log_level(LOG_LEVEL)
+		),
 		cache_logger_on_first_use=True,
 	)
-
-
-def get_logger(name: str) -> structlog.BoundLogger:
-	return structlog.get_logger(name)
