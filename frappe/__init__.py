@@ -27,6 +27,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, Optional, TypeAlias, overload
 
 import click
+from frappe.logging.config import configure_logging
 from werkzeug.local import Local, release_local
 
 import frappe
@@ -87,6 +88,7 @@ controllers = {}
 local = Local()
 cache = None
 STANDARD_USERS = ("Guest", "Administrator")
+configure_logging(app_name="frappe")
 
 _one_time_setup = {}
 _dev_server = int(sbool(os.environ.get("DEV_SERVER", False)))
