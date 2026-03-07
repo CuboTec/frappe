@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from functools import wraps
 
-from frappe.logging.config import get_logger
 from frappe.logging.context import bound_event_context
+from frappe.logging.logger import get_logger
 
 
 def log_context(*, event: str, name: str):
