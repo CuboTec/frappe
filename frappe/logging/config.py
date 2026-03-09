@@ -61,7 +61,7 @@ def configure_logging(*, app_name: str) -> None:
 		force=True
 	)
 
-	processors: List[structlog.typing.Processor] = [
+	common_processors: List[structlog.typing.Processor] = [
 		structlog.contextvars.merge_contextvars,
 		add_base_contexts(ENVIRONMENT, VERSION, app_name),
 		structlog.processors.add_log_level,
@@ -71,6 +71,10 @@ def configure_logging(*, app_name: str) -> None:
 		structlog.stdlib.add_logger_name,
 		structlog.stdlib.add_log_level,
 		structlog.stdlib.PositionalArgumentsFormatter(),
+	]
+
+	structlog_processors = [
+		*common_processors,
 		structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
 	]
 
@@ -83,7 +87,7 @@ def configure_logging(*, app_name: str) -> None:
 	main_handler.setFormatter(
 		structlog.stdlib.ProcessorFormatter(
 			processor=renderer,
-			foreign_pre_chain=processors
+			foreign_pre_chain=common_processors
 		)
 	)
 
@@ -105,7 +109,7 @@ def configure_logging(*, app_name: str) -> None:
 		_BytesFormatter(
 			structlog.stdlib.ProcessorFormatter(
 				processor=structlog.processors.JSONRenderer(sort_keys=True),
-				foreign_pre_chain=processors
+				foreign_pre_chain=common_processors
 			)
 		)
 	)
@@ -115,7 +119,7 @@ def configure_logging(*, app_name: str) -> None:
 	root_logger.setLevel(logging.INFO)
 
 	structlog.configure(
-		processors=processors,
+		processors=structlog_processors,
 		logger_factory=structlog.stdlib.LoggerFactory(),
 		wrapper_class=structlog.make_filtering_bound_logger(
 			_resolve_log_level(LOG_LEVEL)
