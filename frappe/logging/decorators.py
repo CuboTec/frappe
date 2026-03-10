@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from functools import wraps
 
-from frappe.logging.context import bound_event_context
+from frappe.logging.context import bound_action_context
 from frappe.logging.logger import get_logger
 
 
@@ -18,7 +18,7 @@ def log_context(*, event: str, name: str):
 
 		@wraps(func)
 		def wrapper(*args, **kwargs):
-			with bound_event_context(event):
+			with bound_action_context(event):
 				logger.info(f"Starting execution of {func.__name__}")
 				try:
 					result = func(*args, **kwargs)

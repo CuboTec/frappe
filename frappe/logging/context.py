@@ -52,18 +52,18 @@ def clear_request_context() -> None:
 	clear_contextvars()
 
 
-def bind_event_context(event):
-	bind_contextvars(event=event)
+def bind_action_context(action):
+	bind_contextvars(action=action)
 
 
-def unbind_event_context():
+def unbind_action_context():
 	unbind_contextvars('event')
 
 
 @contextmanager
-def bound_event_context(name: str) -> Iterator[None]:
-	bind_event_context(name)
+def bound_action_context(action: str) -> Iterator[None]:
+	bind_action_context(action)
 	try:
 		yield
 	finally:
-		unbind_event_context()
+		unbind_action_context()
