@@ -368,6 +368,22 @@ def remove_from_installed_apps(app_name):
 			post_install()
 
 
+def normalize_required_app_name(required_app: str) -> str:
+	"""Return the installed app name declared in a required_apps hook entry."""
+	entry = (required_app or "").strip().rstrip("/")
+	if not entry:
+		return entry
+
+	if is_git_url(entry) or entry.startswith(("http://", "https://", "git@", "ssh://")) or os.path.exists(entry):
+		with suppress(Exception):
+			return parse_app_name(entry)
+
+	if "/" in entry:
+		return entry.split("/")[-1]
+
+	return entry
+
+
 def remove_app(app_name, dry_run=False, yes=False, no_backup=False, force=False):
 	"""Remove app and all linked to the app's module with the app from a site."""
 
@@ -384,7 +400,10 @@ def remove_app(app_name, dry_run=False, yes=False, no_backup=False, force=False)
 	for app in frappe.get_installed_apps():
 		if app != app_name:
 			hooks = frappe.get_hooks(app_name=app)
-			if hooks.required_apps and any(app_name in required_app for required_app in hooks.required_apps):
+			if hooks.required_apps and any(
+				app_name == normalize_required_app_name(required_app)
+				for required_app in hooks.required_apps
+			):
 				click.secho(f"App {app_name} is a dependency of {app}. Uninstall {app} first.", fg="yellow")
 				return
 
