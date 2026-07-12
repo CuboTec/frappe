@@ -207,7 +207,20 @@ def fetch_job_ids(queue: Queue, status: str) -> list[str]:
 
 	registry = registry_map.get(status)
 	if registry is not None:
-		job_ids = registry.get_job_ids()
+		# Queue.get_job_ids() is fine; BaseRegistry.get_job_ids() calls cleanup(),
+		# which may run failure callbacks with SIGALRM — breaks under gunicorn
+		# threads (frappe#32044). Prefer cleanup=False; fallback for older RQ.
+		if isinstance(registry, Queue):
+			job_ids = registry.get_job_ids()
+		else:
+			try:
+				job_ids = registry.get_job_ids(cleanup=False)
+			except TypeError:
+				from rq.utils import as_text
+
+				job_ids = [
+					as_text(job_id) for job_id in registry.connection.zrange(registry.key, 0, -1)
+				]
 		return [j for j in job_ids if j]
 
 	return []
@@ -218,7 +231,13 @@ def remove_failed_jobs():
 	frappe.only_for("System Manager")
 	for queue in get_queues():
 		fail_registry = queue.failed_job_registry
-		failed_jobs = filter_current_site_jobs(fail_registry.get_job_ids())
+		try:
+			raw_ids = fail_registry.get_job_ids(cleanup=False)
+		except TypeError:
+			from rq.utils import as_text
+
+			raw_ids = [as_text(job_id) for job_id in fail_registry.connection.zrange(fail_registry.key, 0, -1)]
+		failed_jobs = filter_current_site_jobs(raw_ids)
 
 		# Delete in batches to avoid loading too many things in memory
 		conn = get_redis_conn()
